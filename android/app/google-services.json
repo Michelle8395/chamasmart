@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "798450088430",
+    "project_id": "chamasmart",
+    "storage_bucket": "chamasmart.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:798450088430:android:c88dedccb3f32deab976ff",
+        "android_client_info": {
+          "package_name": "com.chamasmart.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBlKsPKCxbwUAecKg2ilQS-FT1nH9PZDj8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
