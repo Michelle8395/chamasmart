@@ -4,15 +4,25 @@ ChamaSmart is a Flutter-based mobile application designed to simplify the manage
 
 ---
 
-## 🚀 Features
+ ## 🚀 Features
 
-- 🔐 Firebase Authentication (Email/Password)
-- 💳 **M-Pesa Integration** via Daraja API (STK Push for contributions/payments)
+- 🔐 Firebase Authentication (Email/Password)  
+  - ⚠️Note:Verification code logic is not yet connected to Firestore. You can enter any code to proceed during registration for now.
+
+- 💳 M-Pesa Integration via Daraja API (STK Push for contributions/payments)  
+  - ⚠️ Currently under development.** STK push functionality may not work as expected at this stage.
+
 - 📈 Track contributions, withdrawals, deposits, profits, and fines
+
 - 🧾 Member management and meeting scheduling
+
 - 💬 Real-time chat (Firebase)
-- 🧠 Built-in AI Assistant for user support (OpenAI integration; prompt/response disabled until API is activated)
+
+- 🧠 Built-in AI Assistant for user support (OpenAI integration)  
+  - ⚠️API not yet activated.** Assistant is visible but will not respond to prompts until OpenAI billing is set up.
+
 - 📱 Clean, intuitive Flutter UI
+
 
 ---
 
