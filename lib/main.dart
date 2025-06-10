@@ -1,6 +1,16 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'firebase_options.dart';
+import 'package:table_calendar/table_calendar.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
   runApp(const ChamaSmartApp());
 }
 
@@ -11,6 +21,7 @@ class ChamaSmartApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'ChamaSmart',
+      debugShowCheckedModeBanner: false,
       theme: ThemeData(
         primarySwatch: Colors.green,
         scaffoldBackgroundColor: const Color(0xFFF5F5DC),
@@ -28,15 +39,55 @@ class ChamaSmartApp extends StatelessWidget {
         '/withdrawals': (context) => const WithdrawalsScreen(),
         '/profits': (context) => const ProfitsAndDividendsScreen(),
         '/loan-request': (context) => const LoanRequestFormScreen(),
-        '/fines': (context) => FinesIncurredScreen(),
-        '/chat': (context) => ChatRoomScreen(),
+        '/fines': (context) => const FinesIncurredScreen(),
+        '/chat': (context) => const ChatRoomScreen(),
+        '/meetings': (context) => const MeetingsScreen(),
+        '/members': (context) => const MembersScreen(),
       },
     );
   }
 }
 
-List<String> members = [];
-String? admin;
+// Firebase Auth helper functions
+Future<void> signUp(String email, String password, BuildContext context) async {
+  try {
+    await FirebaseAuth.instance.createUserWithEmailAndPassword(
+      email: email,
+      password: password,
+    );
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text("Sign up successful! Please verify your email.")),
+    );
+  } catch (e) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text("Sign up failed: $e")),
+    );
+  }
+}
+
+Future<void> signIn(String email, String password, BuildContext context) async {
+  try {
+    await FirebaseAuth.instance.signInWithEmailAndPassword(
+      email: email,
+      password: password,
+    );
+    Navigator.pushReplacementNamed(context, '/dashboard');
+  } catch (e) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text("Login failed: $e")),
+    );
+  }
+}
+
+List<String> members = [
+  "Lucy Nduta Gichuru",
+  "David Otieno Owino",
+  "Elizabeth Mwake",
+  "Jane Nyeri Kamau",
+  "Ahmed Nazer Hussein",
+  "Mary Atieno Achieng",
+  "Samuel Mwangi Thuo",
+];
 
 // SPLASH SCREEN
 class SplashScreen extends StatelessWidget {
@@ -44,7 +95,7 @@ class SplashScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    Future.delayed(const Duration(seconds: 3), () {
+    Future.delayed(const Duration(seconds: 2), () {
       Navigator.pushReplacementNamed(context, '/terms');
     });
 
@@ -54,7 +105,7 @@ class SplashScreen extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Image.asset(
-              'assets/Images/Chamasmart_logo.jpg',
+              'assets/Images/CHAMASMART.jpg',
               width: 150,
               height: 150,
             ),
@@ -157,21 +208,14 @@ class LoginScreen extends StatefulWidget {
 
 class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _usernameController = TextEditingController();
-  final _idController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
 
-  void _login() {
+  void _login() async {
     if (_formKey.currentState!.validate()) {
-      String username = _usernameController.text.trim();
-      if (members.contains(username)) {
-        Navigator.pushReplacementNamed(context, '/dashboard');
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("User not found. Please register.")),
-        );
-      }
+      String email = _emailController.text.trim();
+      String password = _passwordController.text.trim();
+      await signIn(email, password, context);
     }
   }
 
@@ -239,27 +283,6 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                 ),
                 const SizedBox(height: 20),
-                _buildField(
-                  "USERNAME",
-                  _usernameController,
-                  validator: (value) {
-                    if (value == null || value.isEmpty) return "Username is required";
-                    if (value.length < 3 || value.length > 15) return "Username must be 3-15 characters";
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 15),
-                _buildField(
-                  "NATIONAL ID NO",
-                  _idController,
-                  keyboardType: TextInputType.number,
-                  validator: (value) {
-                    if (value == null || value.isEmpty) return "ID is required";
-                    if (!RegExp(r'^\d{7,8}$').hasMatch(value)) return "Enter a valid 7-8 digit ID";
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 15),
                 _buildField(
                   "EMAIL ADDRESS",
                   _emailController,
@@ -336,22 +359,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
 
-  void _register() {
+  void _register() async {
     if (_formKey.currentState!.validate()) {
-      String name = _nameController.text.trim();
-      if (members.contains(name)) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("User already exists. Please login.")),
-        );
-        return;
-      }
-      members.add(name);
-      if (members.length == 1) {
-        admin = name;
-      }
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Verification code sent via SMS")),
-      );
+      String email = _emailController.text.trim();
+      String password = _passwordController.text.trim();
+      await signUp(email, password, context);
+      members.add(_nameController.text.trim());
       Navigator.pushNamed(context, '/verification');
     }
   }
@@ -527,7 +540,7 @@ class VerificationScreen extends StatelessWidget {
             const SizedBox(height: 30),
             ElevatedButton(
               onPressed: () {
-                Navigator.pushNamed(context, '/dashboard');
+                Navigator.pushReplacementNamed(context, '/dashboard');
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.green,
@@ -548,92 +561,146 @@ class DashboardScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (members.isEmpty) {
-      Future.microtask(() {
-        Navigator.pushReplacementNamed(context, '/register');
-      });
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      );
-    }
-
-    final String userName = members.last;
+    final String userName = members.isNotEmpty ? members.last : "User";
 
     final List<Map<String, String>> features = [
-      {"label": "GENERAL CHAMA CONTRIBUTIONS", "icon": "placeholder"},
-      {"label": "DEPOSITS", "icon": "placeholder"},
-      {"label": "WITHDRAWALS", "icon": "placeholder"},
-      {"label": "PROFITS & DIVIDENDS", "icon": "placeholder"},
-      {"label": "LOAN REQUEST FORM", "icon": "placeholder"},
-      {"label": "FINES INCURRED", "icon": "placeholder"},
-      {"label": "GENERAL CHAMA CHAT ROOM", "icon": "placeholder"},
+      {
+        "label": "GENERAL CHAMA CONTRIBUTIONS",
+        "icon": "assets/Images/GENERAL CHAMA CONTRIBUTIONS.jpg",
+        "route": "/contributions"
+      },
+      {
+        "label": "DEPOSITS",
+        "icon": "assets/Images/DEPOSITS.webp",
+        "route": "/deposits"
+      },
+      {
+        "label": "WITHDRAWALS",
+        "icon": "assets/Images/WITHDRAWALS.jpg",
+        "route": "/withdrawals"
+      },
+      {
+        "label": "PROFITS & DIVIDENDS",
+        "icon": "assets/Images/PROFITS AND DIVIDENDS.png",
+        "route": "/profits"
+      },
+      {
+        "label": "LOAN REQUEST FORM",
+        "icon": "assets/Images/LOAN REQUEST FORM.png",
+        "route": "/loan-request"
+      },
+      {
+        "label": "FINES INCURRED",
+        "icon": "assets/Images/FINES INCURRED.jpg",
+        "route": "/fines"
+      },
+      {
+        "label": "GENERAL CHAMA CHAT ROOM",
+        "icon": "assets/Images/CHAT ROOM.png",
+        "route": "/chat"
+      },
     ];
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text("CHAMaSMART"),
-        actions: const [
-          Icon(Icons.arrow_drop_down),
+        title: const Text("CHAMASMART"),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.auto_awesome, color: Colors.amber, size: 30),
+            tooltip: "AI Assistant",
+            onPressed: () {
+              showDialog(
+                context: context,
+                builder: (context) => const AIAssistantDialog(),
+              );
+            },
+          ),
         ],
       ),
       drawer: Drawer(
         child: ListView(
-          children: const [
-            DrawerHeader(child: Text("Menu")),
-            ListTile(title: Text("Dashboard")),
-            ListTile(title: Text("Settings")),
+          children: [
+            const DrawerHeader(child: Text("Menu")),
+            ListTile(
+              leading: const Icon(Icons.dashboard),
+              title: const Text("Dashboard"),
+              onTap: () {
+                Navigator.pushReplacementNamed(context, '/dashboard');
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.event),
+              title: const Text("Meetings"),
+              onTap: () {
+                Navigator.pushNamed(context, '/meetings');
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.people),
+              title: const Text("Members"),
+              onTap: () {
+                Navigator.pushNamed(context, '/members');
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.settings),
+              title: const Text("Settings"),
+              onTap: () {},
+            ),
           ],
         ),
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              "Hello and welcome $userName",
-              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w500),
-            ),
-            const SizedBox(height: 20),
+            Text('Welcome, $userName!',
+                style: const TextStyle(
+                    fontSize: 20, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 16),
             Expanded(
-              child: GridView.count(
-                crossAxisCount: 2,
-                mainAxisSpacing: 20,
-                crossAxisSpacing: 20,
-                childAspectRatio: 1,
-                children: features.map((feature) {
-                  return InkWell(
+              child: GridView.builder(
+                itemCount: features.length,
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 2,
+                  childAspectRatio: 1,
+                  crossAxisSpacing: 16,
+                  mainAxisSpacing: 16,
+                ),
+                itemBuilder: (context, index) {
+                  final feature = features[index];
+                  return GestureDetector(
                     onTap: () {
-                      if (feature["label"] == "GENERAL CHAMA CONTRIBUTIONS") {
-                        Navigator.pushNamed(context, '/contributions');
-                      } else if (feature["label"] == "DEPOSITS") {
-                        Navigator.pushNamed(context, '/deposits');
-                      } else if (feature["label"] == "WITHDRAWALS") {
-                        Navigator.pushNamed(context, '/withdrawals');
-                      } else if (feature["label"] == "PROFITS & DIVIDENDS") {
-                        Navigator.pushNamed(context, '/profits');
-                      } else if (feature["label"] == "LOAN REQUEST FORM") {
-                        Navigator.pushNamed(context, '/loan-request');
-                      } else if (feature["label"] == "FINES INCURRED") {
-                        Navigator.pushNamed(context, '/fines');
-                      } else if (feature["label"] == "GENERAL CHAMA CHAT ROOM") {
-                        Navigator.pushNamed(context, '/chat');
-                      }
+                      Navigator.pushNamed(context, feature['route']!);
                     },
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Icon(Icons.crop_square, size: 40),
-                        const SizedBox(height: 8),
-                        Text(
-                          feature["label"]!,
-                          textAlign: TextAlign.center,
-                          style: const TextStyle(fontSize: 12),
-                        ),
-                      ],
+                    child: Card(
+                      elevation: 4,
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16)),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Image.asset(
+                            feature['icon']!,
+                            width: 64,
+                            height: 64,
+                            fit: BoxFit.contain,
+                          ),
+                          const SizedBox(height: 12),
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                            child: Text(
+                              feature['label']!,
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(
+                                  fontWeight: FontWeight.bold, fontSize: 14),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   );
-                }).toList(),
+                },
               ),
             ),
           ],
@@ -643,7 +710,7 @@ class DashboardScreen extends StatelessWidget {
   }
 }
 
-// GENERAL CHAMA CONTRIBUTIONS SCREEN
+// --- GENERAL CHAMA CONTRIBUTIONS SCREEN ---
 class GeneralChamaContributionsScreen extends StatelessWidget {
   const GeneralChamaContributionsScreen({super.key});
 
@@ -661,30 +728,21 @@ class GeneralChamaContributionsScreen extends StatelessWidget {
       },
       {
         "id": "CHM002",
-        "name": "David Otieno Owino",
-        "phone": "0722456789",
-        "date": "2025-06-04",
+        "name": "Lucy Nduta Gichuru",
+        "phone": "0723456789",
+        "date": "2025-06-03",
         "amount": "3,000",
         "status": "Completed",
         "receipt": "MPESAX YZ506"
       },
       {
         "id": "CHM003",
-        "name": "Alice Wanjiku Murungi",
-        "phone": "0733567890",
-        "date": "2025-05-10",
-        "amount": "1,500",
-        "status": "Partial",
-        "receipt": "BANKTR F3301"
-      },
-      {
-        "id": "CHM004",
-        "name": "Kevin Kiprono Kibet",
-        "phone": "0744678901",
-        "date": "2025-05-09",
-        "amount": "0",
-        "status": "Missed",
-        "receipt": "-"
+        "name": "David Otieno Owino",
+        "phone": "0734567890",
+        "date": "2025-06-03",
+        "amount": "3,000",
+        "status": "Completed",
+        "receipt": "MPESAX YZ507"
       },
     ];
 
@@ -697,6 +755,8 @@ class GeneralChamaContributionsScreen extends StatelessWidget {
         padding: const EdgeInsets.all(12.0),
         child: Column(
           children: [
+             
+            const SizedBox(height: 10),
             const Text(
               "GENERAL CHAMA CONTRIBUTIONS",
               style: TextStyle(
@@ -710,7 +770,7 @@ class GeneralChamaContributionsScreen extends StatelessWidget {
               child: SingleChildScrollView(
                 scrollDirection: Axis.horizontal,
                 child: DataTable(
-                  headingRowColor: MaterialStateColor.resolveWith(
+                  headingRowColor: WidgetStateColor.resolveWith(
                       (states) => Colors.blueGrey.shade100),
                   columns: const [
                     DataColumn(label: Text("Member ID")),
@@ -738,7 +798,7 @@ class GeneralChamaContributionsScreen extends StatelessWidget {
                                     ? Colors.orange
                                     : Colors.red,
                             fontWeight: FontWeight.bold,
-                          ),
+                            ),
                         ),
                       ),
                       DataCell(Text(data["receipt"]!)),
@@ -754,9 +814,61 @@ class GeneralChamaContributionsScreen extends StatelessWidget {
   }
 }
 
-// DEPOSITS SCREEN
-class DepositsScreen extends StatelessWidget {
+// --- DEPOSITS SCREEN ---
+class DepositsScreen extends StatefulWidget {
   const DepositsScreen({super.key});
+
+  @override
+  State<DepositsScreen> createState() => _DepositsScreenState();
+}
+
+class _DepositsScreenState extends State<DepositsScreen> {
+  final phoneController = TextEditingController();
+  final amountController = TextEditingController();
+  bool _loading = false;
+
+  Future<void> payWithMpesa() async {
+    final phone = phoneController.text.trim();
+    final amount = amountController.text.trim();
+
+    if (phone.isEmpty || !RegExp(r'^254\d{9}$').hasMatch(phone)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Enter a valid phone (2547XXXXXXXX)")),
+      );
+      return;
+    }
+    if (amount.isEmpty || double.tryParse(amount) == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Enter a valid amount")),
+      );
+      return;
+    }
+
+    setState(() => _loading = true);
+    final url = Uri.parse('http://192.168.117.181:3001/mpesa/stkpush');
+    try {
+      final res = await http.post(
+        url,
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'phone': phone, 'amount': amount}),
+      );
+      setState(() => _loading = false);
+      if (res.statusCode == 200) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Payment prompt sent!")),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Payment failed: ${res.body}")),
+        );
+      }
+    } catch (e) {
+      setState(() => _loading = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Error: $e")),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -841,11 +953,43 @@ class DepositsScreen extends StatelessWidget {
         title: const Text("Deposits"),
         centerTitle: true,
       ),
-      body: Padding(
+      body: SingleChildScrollView(
         padding: const EdgeInsets.all(12.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            TextField(
+              controller: phoneController,
+              decoration: const InputDecoration(labelText: "Phone Number (2547XXXXXXXX)"),
+              keyboardType: TextInputType.phone,
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: amountController,
+              decoration: const InputDecoration(labelText: "Amount"),
+              keyboardType: TextInputType.number,
+            ),
+            const SizedBox(height: 20),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                icon: _loading
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                      )
+                    : const Icon(Icons.phone_android),
+                label: const Text("Pay with M-Pesa"),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.green,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                ),
+                onPressed: _loading ? null : payWithMpesa,
+              ),
+            ),
+            const SizedBox(height: 24),
             Text("Full Name: ${userDetails["fullName"]}"),
             Text("Member ID: ${userDetails["memberId"]}"),
             Text("Joined Date: ${userDetails["joinedDate"]}"),
@@ -858,41 +1002,39 @@ class DepositsScreen extends StatelessWidget {
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 10),
-            Expanded(
-              child: SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: DataTable(
-                  headingRowColor: MaterialStateColor.resolveWith(
-                      (states) => Colors.lightBlue.shade50),
-                  columns: const [
-                    DataColumn(label: Text("Month")),
-                    DataColumn(label: Text("Contribution Date")),
-                    DataColumn(label: Text("Amount (KES)")),
-                    DataColumn(label: Text("Payment Method")),
-                    DataColumn(label: Text("Receipt No.")),
-                    DataColumn(label: Text("Status")),
-                  ],
-                  rows: deposits.map((data) {
-                    return DataRow(cells: [
-                      DataCell(Text(data["month"]!)),
-                      DataCell(Text(data["date"]!)),
-                      DataCell(Text(data["amount"]!)),
-                      DataCell(Text(data["method"]!)),
-                      DataCell(Text(data["receipt"]!)),
-                      DataCell(
-                        Text(
-                          data["status"]!,
-                          style: TextStyle(
-                            color: data["status"] == "Completed"
-                                ? Colors.green
-                                : Colors.orange,
-                            fontWeight: FontWeight.bold,
-                          ),
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: DataTable(
+                headingRowColor: WidgetStateColor.resolveWith(
+                    (states) => Colors.lightBlue.shade50),
+                columns: const [
+                  DataColumn(label: Text("Month")),
+                  DataColumn(label: Text("Contribution Date")),
+                  DataColumn(label: Text("Amount (KES)")),
+                  DataColumn(label: Text("Payment Method")),
+                  DataColumn(label: Text("Receipt No.")),
+                  DataColumn(label: Text("Status")),
+                ],
+                rows: deposits.map((data) {
+                  return DataRow(cells: [
+                    DataCell(Text(data["month"]!)),
+                    DataCell(Text(data["date"]!)),
+                    DataCell(Text(data["amount"]!)),
+                    DataCell(Text(data["method"]!)),
+                    DataCell(Text(data["receipt"]!)),
+                    DataCell(
+                      Text(
+                        data["status"]!,
+                        style: TextStyle(
+                          color: data["status"] == "Completed"
+                              ? Colors.green
+                              : Colors.orange,
+                          fontWeight: FontWeight.bold,
                         ),
                       ),
-                    ]);
-                  }).toList(),
-                ),
+                    ),
+                  ]);
+                }).toList(),
               ),
             ),
           ],
@@ -902,113 +1044,71 @@ class DepositsScreen extends StatelessWidget {
   }
 }
 
-// WITHDRAWALS SCREEN
+// --- WITHDRAWALS SCREEN ---
 class WithdrawalsScreen extends StatelessWidget {
   const WithdrawalsScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
+    final List<Map<String, String>> withdrawals = [
+      {
+        "date": "2025-06-01",
+        "amount": "2,000",
+        "method": "M-Pesa",
+        "destination": "0712345678",
+        "status": "Success"
+      },
+      {
+        "date": "2025-05-15",
+        "amount": "1,500",
+        "method": "Bank Transfer",
+        "destination": "Equity Bank",
+        "status": "Success"
+      },
+      {
+        "date": "2025-04-20",
+        "amount": "1,000",
+        "method": "M-Pesa",
+        "destination": "0723456789",
+        "status": "Success"
+      },
+    ];
+
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Withdraw Funds'),
+        title: const Text('Withdrawals'),
         centerTitle: true,
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
+      body: Padding(
+        padding: const EdgeInsets.all(12.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Card(
-              elevation: 4,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              child: const Padding(
-                padding: EdgeInsets.all(20),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      'Available Balance',
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-                    ),
-                    Text(
-                      'KES 7,000',
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(height: 24),
             const Text(
-              'Enter Withdrawal Details',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+              "Recent Withdrawals",
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
-            const SizedBox(height: 12),
-            // Add validation if you want to make this a form
-            TextField(
-              decoration: InputDecoration(
-                labelText: 'Amount (KES)',
-                prefixIcon: const Icon(Icons.money),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+            const SizedBox(height: 10),
+            Expanded(
+              child: ListView.builder(
+                itemCount: withdrawals.length,
+                itemBuilder: (context, index) {
+                  final withdrawal = withdrawals[index];
+                  return Card(
+                    margin: const EdgeInsets.symmetric(vertical: 8),
+                    child: ListTile(
+                      leading: const Icon(Icons.swap_vert, color: Colors.green),
+                      title: Text('KES ${withdrawal["amount"]}'),
+                      subtitle: Text('${withdrawal["method"]} • ${withdrawal["date"]}'),
+                      trailing: Text(
+                        withdrawal["status"]!,
+                        style: const TextStyle(
+                            color: Colors.green, fontWeight: FontWeight.w600),
+                      ),
+                    ),
+                  );
+                },
               ),
-              keyboardType: TextInputType.number,
-            ),
-            const SizedBox(height: 16),
-            DropdownButtonFormField<String>(
-              items: const [
-                DropdownMenuItem(value: 'mpesa', child: Text('M-Pesa')),
-                DropdownMenuItem(value: 'bank', child: Text('Bank Transfer')),
-              ],
-              decoration: InputDecoration(
-                labelText: 'Withdrawal Method',
-                prefixIcon: const Icon(Icons.account_balance_wallet),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-              ),
-              onChanged: (value) {},
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              decoration: InputDecoration(
-                labelText: 'Destination (Phone/Bank)',
-                prefixIcon: const Icon(Icons.send),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-              ),
-              keyboardType: TextInputType.text,
-            ),
-            const SizedBox(height: 20),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                icon: const Icon(Icons.check),
-                label: const Text('Withdraw'),
-                onPressed: () {},
-                style: ElevatedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                ),
-              ),
-            ),
-            const SizedBox(height: 30),
-            const Text(
-              'Recent Withdrawals',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-            ),
-            const SizedBox(height: 12),
-            ListView.builder(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: 3,
-              itemBuilder: (context, index) {
-                return const ListTile(
-                  leading: Icon(Icons.swap_vert, color: Colors.green),
-                  title: Text('KES 1,000'),
-                  subtitle: Text('M-Pesa • 2025-06-04'),
-                  trailing: Text(
-                    'Success',
-                    style: TextStyle(color: Colors.green, fontWeight: FontWeight.w600),
-                  ),
-                );
-              },
             ),
           ],
         ),
@@ -1017,13 +1117,13 @@ class WithdrawalsScreen extends StatelessWidget {
   }
 }
 
-// PROFITS AND DIVIDENDS
+// --- PROFITS AND DIVIDENDS SCREEN ---
 class ProfitsAndDividendsScreen extends StatelessWidget {
   const ProfitsAndDividendsScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
-    final List<Map<String, String>> members = [
+    final List<Map<String, String>> membersData = [
       {
         'id': 'CHM001',
         'name': 'Lucy Nduta Gichuru',
@@ -1093,7 +1193,7 @@ class ProfitsAndDividendsScreen extends StatelessWidget {
           scrollDirection: Axis.horizontal,
           child: DataTable(
             headingRowColor:
-                MaterialStateColor.resolveWith((states) => Colors.grey.shade200),
+                WidgetStateColor.resolveWith((states) => Colors.grey.shade200),
             columns: const [
               DataColumn(label: Text('Member ID')),
               DataColumn(label: Text('Full Name')),
@@ -1102,7 +1202,7 @@ class ProfitsAndDividendsScreen extends StatelessWidget {
               DataColumn(label: Text('Dividend Earned (KES)')),
               DataColumn(label: Text('Status')),
             ],
-            rows: members.map((member) {
+            rows: membersData.map((member) {
               return DataRow(
                 cells: [
                   DataCell(Text(member['id']!)),
@@ -1127,7 +1227,7 @@ class ProfitsAndDividendsScreen extends StatelessWidget {
   }
 }
 
-// LOAN REQUEST FORM
+// --- LOAN REQUEST FORM SCREEN ---
 class LoanRequestFormScreen extends StatefulWidget {
   const LoanRequestFormScreen({super.key});
 
@@ -1144,7 +1244,7 @@ class _LoanRequestFormScreenState extends State<LoanRequestFormScreen> {
   final TextEditingController repaymentPeriodController = TextEditingController();
   final TextEditingController purposeController = TextEditingController();
 
-  final List<Map<String, String>> members = [
+  final List<Map<String, String>> membersList = [
     {'id': 'CHM001', 'name': 'Lucy Nduta Gichuru'},
     {'id': 'CHM002', 'name': 'David Otieno Owino'},
     {'id': 'CHM003', 'name': 'Elizabeth Mwake'},
@@ -1164,7 +1264,7 @@ class _LoanRequestFormScreenState extends State<LoanRequestFormScreen> {
               DropdownButtonFormField<String>(
                 decoration: const InputDecoration(labelText: 'Member ID'),
                 value: selectedMemberId,
-                items: members.map((member) {
+                items: membersList.map((member) {
                   return DropdownMenuItem(
                     value: member['id'],
                     child: Text(member['id']!),
@@ -1173,7 +1273,7 @@ class _LoanRequestFormScreenState extends State<LoanRequestFormScreen> {
                 onChanged: (value) {
                   setState(() {
                     selectedMemberId = value;
-                    fullNameController.text = members
+                    fullNameController.text = membersList
                         .firstWhere((m) => m['id'] == value)['name']!;
                   });
                 },
@@ -1241,15 +1341,17 @@ class _LoanRequestFormScreenState extends State<LoanRequestFormScreen> {
   }
 }
 
-// FINES INCURRED SCREEN
+// --- FINES INCURRED SCREEN ---
 class FinesIncurredScreen extends StatelessWidget {
-  final List<Map<String, String>> fines = [
-    {"member": "Jane Doe", "reason": "Late payment", "amount": "KES 200"},
-    {"member": "John Smith", "reason": "Missed meeting", "amount": "KES 150"},
-  ];
+  const FinesIncurredScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
+    final List<Map<String, String>> fines = [
+      {"member": "Jane Doe", "reason": "Late payment", "amount": "KES 200"},
+      {"member": "John Smith", "reason": "Missed meeting", "amount": "KES 150"},
+    ];
+
     return Scaffold(
       appBar: AppBar(title: const Text("Fines Incurred")),
       body: Padding(
@@ -1274,15 +1376,17 @@ class FinesIncurredScreen extends StatelessWidget {
         onPressed: () {
           // Add fine logic here
         },
-        child: const Icon(Icons.add),
         tooltip: 'Add Fine',
+        child: const Icon(Icons.add),
       ),
     );
   }
 }
 
-// GENERAL CHAMA CHAT ROOM
+// --- CHAT ROOM SCREEN ---
 class ChatRoomScreen extends StatefulWidget {
+  const ChatRoomScreen({super.key});
+
   @override
   _ChatRoomScreenState createState() => _ChatRoomScreenState();
 }
@@ -1366,6 +1470,184 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
           )
         ],
       ),
+    );
+  }
+}
+
+// --- MEETINGS SCREEN ---
+class MeetingsScreen extends StatelessWidget {
+  const MeetingsScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final List<DateTime> meetings = [
+      DateTime.now().add(const Duration(days: 2)),
+      DateTime.now().add(const Duration(days: 7)),
+    ];
+
+    return Scaffold(
+      appBar: AppBar(title: const Text("Meetings")),
+      body: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          children: [
+            const Text(
+              "Upcoming Meetings",
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            TableCalendar(
+              firstDay: DateTime.utc(2020, 1, 1),
+              lastDay: DateTime.utc(2030, 12, 31),
+              focusedDay: DateTime.now(),
+              calendarBuilders: CalendarBuilders(
+                markerBuilder: (context, date, events) {
+                  if (meetings.any((m) =>
+                      m.year == date.year &&
+                      m.month == date.month &&
+                      m.day == date.day)) {
+                    return const Icon(Icons.event, color: Colors.green, size: 16);
+                  }
+                  return null;
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// --- MEMBERS SCREEN ---
+class MembersScreen extends StatelessWidget {
+  const MembersScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text("All Members")),
+      body: ListView.builder(
+        itemCount: members.length,
+        itemBuilder: (context, index) {
+          return ListTile(
+            leading: const Icon(Icons.person),
+            title: Text(members[index]),
+          );
+        },
+      ),
+    );
+  }
+}
+
+// --- AI ASSISTANT DIALOG (placeholder) ---
+class AIAssistantDialog extends StatefulWidget {
+  const AIAssistantDialog({super.key});
+  @override
+  State<AIAssistantDialog> createState() => _AIAssistantDialogState();
+}
+
+class _AIAssistantDialogState extends State<AIAssistantDialog> {
+  final TextEditingController _controller = TextEditingController();
+  String? _response;
+  bool _loading = false;
+
+  Future<void> _askAI() async {
+    if (_controller.text.trim().isEmpty) return;
+    setState(() {
+      _loading = true;
+      _response = null;
+    });
+
+    try {
+      // Replace with your actual AI backend endpoint
+      final url = Uri.parse('http://192.168.117.181:3000/ai');
+      final res = await http.post(
+        url,
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'question': _controller.text}),
+      );
+
+      if (res.statusCode == 200) {
+        final data = jsonDecode(res.body);
+        setState(() {
+          _response = data['answer'] ?? "No answer received.";
+          _loading = false;
+        });
+      } else {
+        setState(() {
+          _response = "Error: ${res.statusCode} ${res.reasonPhrase}";
+          _loading = false;
+        });
+      }
+    } catch (e) {
+      setState(() {
+        _response = "Failed to connect to AI: $e";
+        _loading = false;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      content: SizedBox(
+        width: 350,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.auto_awesome, color: Colors.amber, size: 48),
+            const SizedBox(height: 8),
+            const Text(
+              "AI ASSISTANT",
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 18,
+                color: Colors.amber,
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _controller,
+              decoration: const InputDecoration(
+                labelText: "Ask me anything...",
+                border: OutlineInputBorder(),
+              ),
+              minLines: 1,
+              maxLines: 3,
+            ),
+            const SizedBox(height: 12),
+            ElevatedButton(
+              onPressed: _loading ? null : _askAI,
+              child: _loading
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Text("Send"),
+            ),
+            const SizedBox(height: 16),
+            if (_response != null)
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.grey[100],
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  _response!,
+                  style: const TextStyle(fontSize: 15),
+                ),
+              ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton( 
+          onPressed: () => Navigator.pop(context),
+          child: const Text("Close"),
+        ),
+      ],
     );
   }
 }

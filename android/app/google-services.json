@@ -7,9 +7,9 @@
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:798450088430:android:c88dedccb3f32deab976ff",
+        "mobilesdk_app_id": "1:798450088430:android:46b1bc4d1c7b911ab976ff",
         "android_client_info": {
-          "package_name": "com.chamasmart.app"
+          "package_name": "com.example.chamasmart"
         }
       },
       "oauth_client": [],
