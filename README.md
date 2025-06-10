@@ -10,7 +10,7 @@ ChamaSmart is a Flutter-based mobile application designed to simplify the manage
   - ⚠️Note:Verification code logic is not yet connected to Firestore. You can enter any code to proceed during registration for now.
 
 - 💳 M-Pesa Integration via Daraja API (STK Push for contributions/payments)  
-  - ⚠️ Currently under development.** STK push functionality may not work as expected at this stage.
+  - ⚠️ Currently under development.STK push functionality may not work as expected at this stage.
 
 - 📈 Track contributions, withdrawals, deposits, profits, and fines
 
