@@ -19,7 +19,7 @@ ChamaSmart is a Flutter-based mobile application designed to simplify the manage
 - 💬 Real-time chat (Firebase)
 
 - 🧠 Built-in AI Assistant for user support (OpenAI integration)  
-  - ⚠️API not yet activated.** Assistant is visible but will not respond to prompts until OpenAI billing is set up.
+  - ⚠️API not yet activated.Assistant is visible but will not respond to prompts until OpenAI billing is set up.
 
 - 📱 Clean, intuitive Flutter UI
 
@@ -111,5 +111,8 @@ For support or inquiries, reach out to:
 - GitHub Actions or CI/CD badge
 
 ---
+## ⚠️ Disclaimer
+
+This app is currently under active development. All data displayed or entered is for demo and testing purposes only and should not be considered real or secure. Please do not input sensitive or personal information at this time.
 
  
