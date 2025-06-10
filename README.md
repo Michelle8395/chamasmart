@@ -97,7 +97,6 @@ For support or inquiries, reach out to:
 ### ✅ Optional Additions
 
 - Screenshots of the app
-- Demo video link
 - Environment variable instructions for M-Pesa keys
 - GitHub Actions or CI/CD badge
 
