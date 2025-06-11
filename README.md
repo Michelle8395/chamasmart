@@ -99,7 +99,7 @@ This project is licensed under the [MIT License](LICENSE).
 ## 📬 Contact
 
 For support or inquiries, reach out to:  
-📧 [michellekangethe@example.com]  
+📧 [michellekangethe@gmail.com]  
 📱 +254 717 895 133
 
 ---
