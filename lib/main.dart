@@ -6,6 +6,7 @@ import 'package:table_calendar/table_calendar.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(
@@ -43,21 +44,30 @@ class ChamaSmartApp extends StatelessWidget {
         '/chat': (context) => const ChatRoomScreen(),
         '/meetings': (context) => const MeetingsScreen(),
         '/members': (context) => const MembersScreen(),
+        '/ai-assistant': (context) => const AIAssistantDialog(),
+        '/postVerification': (context) => const PostVerificationScreen(),
+        '/createChama': (context) => const CreateChamaScreen(),
+        '/joinChama': (context) => const JoinChamaScreen(),
+        '/loan-approval': (context) => const LoanApprovalScreen(),
       },
     );
   }
 }
 
 // Firebase Auth helper functions
-Future<void> signUp(String email, String password, BuildContext context) async {
+ Future<void> signUp(String email, String password, BuildContext context) async {
   try {
-    await FirebaseAuth.instance.createUserWithEmailAndPassword(
+    UserCredential userCredential = await FirebaseAuth.instance.createUserWithEmailAndPassword(
       email: email,
       password: password,
     );
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text("Sign up successful! Please verify your email.")),
-    );
+    // Send verification email
+    if (!userCredential.user!.emailVerified) {
+      await userCredential.user!.sendEmailVerification();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Verification email sent! Please check your inbox.")),
+      );
+    }
   } catch (e) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text("Sign up failed: $e")),
@@ -79,6 +89,7 @@ Future<void> signIn(String email, String password, BuildContext context) async {
   }
 }
 
+
 List<String> members = [
   "Lucy Nduta Gichuru",
   "David Otieno Owino",
@@ -87,7 +98,14 @@ List<String> members = [
   "Ahmed Nazer Hussein",
   "Mary Atieno Achieng",
   "Samuel Mwangi Thuo",
+  "Grace Wanjiku Muriuki",
+  "Peter Kiprono Cheruiyot",
+  "Catherine Njeri Wambui",
+  "John Mwangi Kariuki",
+  "Fatuma Hassan Mohamed",
 ];
+String? userGroup;
+String? adminEmail;
 
 // SPLASH SCREEN
 class SplashScreen extends StatelessWidget {
@@ -343,6 +361,7 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 }
 
+
 // REGISTER SCREEN
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -484,7 +503,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
               ),
               const SizedBox(height: 25),
               const Text(
-                "After you tap sign up, you will receive a one-time code via SMS. Kindly enter the verification code below.",
+                "After you tap sign up, you will receive a one-time code via Email. Kindly enter the verification code below.",
                 style: TextStyle(fontSize: 14, color: darkBlue),
               ),
               const SizedBox(height: 25),
@@ -497,6 +516,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 12),
                   ),
                   child: const Text("SIGN UP"),
+                  
                 ),
               ),
             ],
@@ -525,7 +545,7 @@ class VerificationScreen extends StatelessWidget {
         child: Column(
           children: [
             const Text(
-              "Enter the one-time verification code sent via SMS:",
+              "Enter the one-time verification code sent via Email:",
               style: TextStyle(fontSize: 16),
             ),
             const SizedBox(height: 20),
@@ -540,7 +560,7 @@ class VerificationScreen extends StatelessWidget {
             const SizedBox(height: 30),
             ElevatedButton(
               onPressed: () {
-                Navigator.pushReplacementNamed(context, '/dashboard');
+                  Navigator.pushReplacementNamed(context, '/postVerification');
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.green,
@@ -554,15 +574,309 @@ class VerificationScreen extends StatelessWidget {
     );
   }
 }
+// POST VERIFICATION SCREEN
+class PostVerificationScreen extends StatelessWidget {
+  const PostVerificationScreen({super.key});
 
+  @override
+  Widget build(BuildContext context) {
+    // If user is already in a group, go straight to dashboard
+    if (userGroup != null) {
+      Future.microtask(() {
+        Navigator.pushReplacementNamed(
+          context,
+          '/dashboard',
+          arguments: userGroup,
+        );
+      });
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text("Welcome"),
+      ),
+      body: Padding(
+        padding: const EdgeInsets.all(20.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Hello user,\nWhat do you want to do today?',
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 30),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: () async {
+                  final groupName = await Navigator.pushNamed(context, '/createChama');
+                  if (groupName != null && groupName is String) {
+                    userGroup = groupName;
+                    Navigator.pushReplacementNamed(
+                      context,
+                      '/dashboard',
+                      arguments: userGroup,
+                    );
+                  }
+                },
+                child: const Text('CREATE NEW CHAMA'),
+              ),
+            ),
+            const SizedBox(height: 15),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton(
+                onPressed: () async {
+                  final groupName = await Navigator.pushNamed(context, '/joinChama');
+                  if (groupName != null && groupName is String) {
+                    userGroup = groupName;
+                    Navigator.pushReplacementNamed(
+                      context,
+                      '/dashboard',
+                      arguments: userGroup,
+                    );
+                  }
+                },
+                child: const Text('JOIN EXISTING CHAMA'),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+//CREATE CHAMA SCREEN
+class CreateChamaScreen extends StatefulWidget {
+  const CreateChamaScreen({super.key});
+
+  @override
+  State<CreateChamaScreen> createState() => _CreateChamaScreenState();
+}
+
+class _CreateChamaScreenState extends State<CreateChamaScreen> {
+  final _formKey = GlobalKey<FormState>();
+  final _adminController = TextEditingController();
+  final _chamaNameController = TextEditingController();
+  final _frequencyController = TextEditingController();
+  final _amountController = TextEditingController();
+  final _profitController = TextEditingController();
+  final _finesController = TextEditingController();
+  final _codeController = TextEditingController();
+
+  String? _generatedCode;
+  bool _codeSent = false;
+
+ void _createChama() {
+  if (_formKey.currentState!.validate()) {
+    setState(() {
+      _generatedCode = "CHAMA${DateTime.now().millisecondsSinceEpoch % 100000}";
+      _codeSent = true;
+    });
+    // Set admin email
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      adminEmail = user.email;
+    }
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text("Chama created! Code: $_generatedCode (share with members)")),
+    );
+  }
+} 
+
+  void _verifyCode() {
+    if (_codeController.text.trim() == _generatedCode) {
+      // Return the chama name to the previous screen
+      Navigator.pop(context, _chamaNameController.text.trim());
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Invalid code. Please check and try again.")),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text("Create New Chama")),
+      body: Padding(
+        padding: const EdgeInsets.all(20.0),
+        child: Form(
+          key: _formKey,
+          child: ListView(
+            children: [
+              const SizedBox(height: 10),
+              const Text("ADMIN NAME"),
+              TextFormField(
+                controller: _adminController,
+                validator: (v) => v == null || v.isEmpty ? "Enter admin name" : null,
+              ),
+              const SizedBox(height: 15),
+              const Text("CHAMA NAME"),
+              TextFormField(
+                controller: _chamaNameController,
+                validator: (v) => v == null || v.isEmpty ? "Enter chama name" : null,
+              ),
+              const SizedBox(height: 15),
+              const Text("CONTRIBUTION FREQUENCY"),
+              TextFormField(
+                controller: _frequencyController,
+                validator: (v) => v == null || v.isEmpty ? "Enter frequency" : null,
+              ),
+              const SizedBox(height: 15),
+              const Text("CONTRIBUTION AMOUNT"),
+              TextFormField(
+                controller: _amountController,
+                keyboardType: TextInputType.number,
+                validator: (v) => v == null || v.isEmpty ? "Enter amount" : null,
+              ),
+              const SizedBox(height: 15),
+              const Text("PROFIT SHARING RATE"),
+              TextFormField(
+                controller: _profitController,
+                validator: (v) => v == null || v.isEmpty ? "Enter profit sharing rate" : null,
+              ),
+              const SizedBox(height: 15),
+              const Text("FINES"),
+              TextFormField(
+                controller: _finesController,
+                validator: (v) => v == null || v.isEmpty ? "Enter fines" : null,
+              ),
+              const SizedBox(height: 25),
+              const Text(
+                "After you press create, a code will be generated and sent to your email which you will send to your group members so they can use it to join this existing group.",
+                style: TextStyle(fontSize: 13, color: Colors.grey),
+              ),
+              const SizedBox(height: 15),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: _createChama,
+                  child: const Text("CREATE"),
+                ),
+              ),
+              if (_codeSent && _generatedCode != null) ...[
+                const SizedBox(height: 30),
+                TextFormField(
+                  controller: _codeController,
+                  decoration: const InputDecoration(
+                    labelText: "Enter verification code",
+                  ),
+                ),
+                const SizedBox(height: 10),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton(
+                    onPressed: _verifyCode,
+                    child: const Text("VERIFY CODE"),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+//JOIN CHAMA SCREEN
+class JoinChamaScreen extends StatefulWidget {
+  const JoinChamaScreen({super.key});
+
+  @override
+  State<JoinChamaScreen> createState() => _JoinChamaScreenState();
+}
+
+class _JoinChamaScreenState extends State<JoinChamaScreen> {
+  final _codeController = TextEditingController();
+  final _formKey = GlobalKey<FormState>();
+  bool _joining = false;
+
+  void _joinChama() async {
+    if (_formKey.currentState!.validate()) {
+      setState(() => _joining = true);
+
+      // Simulate code validation (replace with real backend check)
+      await Future.delayed(const Duration(seconds: 1));
+      final code = _codeController.text.trim();
+
+      if (code.isNotEmpty) {
+        // For demo, use code as group name. In real app, fetch group name from backend.
+        Navigator.pop(context, code); // Returns group name to PostVerificationScreen
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Invalid code. Please try again.")),
+        );
+      }
+
+      setState(() => _joining = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text("Join Existing Chama")),
+      body: Padding(
+        padding: const EdgeInsets.all(24.0),
+        child: Form(
+          key: _formKey,
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Text(
+                "Enter Group Code",
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _codeController,
+                decoration: const InputDecoration(
+                  border: OutlineInputBorder(),
+                  hintText: "e.g. CHAMA12345",
+                ),
+                validator: (v) => v == null || v.isEmpty ? "Please enter the group code" : null,
+              ),
+              const SizedBox(height: 24),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: _joining ? null : _joinChama,
+                  child: _joining
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                        )
+                      : const Text("JOIN"),
+                ),
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                "Ask your admin for the group code.",
+                style: TextStyle(color: Colors.grey),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
 // DASHBOARD SCREEN
 class DashboardScreen extends StatelessWidget {
   const DashboardScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
-    final String userName = members.isNotEmpty ? members.last : "User";
-
+     final user = FirebaseAuth.instance.currentUser;
+final userName = user?.displayName ?? user?.email ?? "User";
+final isAdmin = user != null && user.email == adminEmail;
     final List<Map<String, String>> features = [
       {
         "label": "GENERAL CHAMA CONTRIBUTIONS",
@@ -588,7 +902,15 @@ class DashboardScreen extends StatelessWidget {
         "label": "LOAN REQUEST FORM",
         "icon": "assets/Images/LOAN REQUEST FORM.png",
         "route": "/loan-request"
+
       },
+
+      if (isAdmin) // Only show for admin
+    {
+      "label": "LOAN APPROVAL",
+      "icon": "assets/Images/LOANS APPROVAL FORM.png",
+      "route": "/loan-approval"
+    },
       {
         "label": "FINES INCURRED",
         "icon": "assets/Images/FINES INCURRED.jpg",
@@ -703,11 +1025,20 @@ class DashboardScreen extends StatelessWidget {
                 },
               ),
             ),
+            if (isAdmin) ...[
+  const SizedBox(height: 12),
+  const Text(
+    "Upcoming Meetings",
+    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+  ),
+  _AdminMeetingsCalendar(),
+],
           ],
         ),
       ),
     );
   }
+  
 }
 
 // --- GENERAL CHAMA CONTRIBUTIONS SCREEN ---
@@ -716,35 +1047,116 @@ class GeneralChamaContributionsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final List<Map<String, String>> contributions = [
-      {
-        "id": "CHM001",
-        "name": "Jane Njeri Kamau",
-        "phone": "0712345678",
-        "date": "2025-06-03",
-        "amount": "3,000",
-        "status": "Completed",
-        "receipt": "MPESAX YZ505"
-      },
-      {
-        "id": "CHM002",
-        "name": "Lucy Nduta Gichuru",
-        "phone": "0723456789",
-        "date": "2025-06-03",
-        "amount": "3,000",
-        "status": "Completed",
-        "receipt": "MPESAX YZ506"
-      },
-      {
-        "id": "CHM003",
-        "name": "David Otieno Owino",
-        "phone": "0734567890",
-        "date": "2025-06-03",
-        "amount": "3,000",
-        "status": "Completed",
-        "receipt": "MPESAX YZ507"
-      },
-    ];
+     final List<Map<String, String>> contributions = [
+  {
+    "id": "CHM001",
+    "name": "Lucy Nduta Gichuru",
+    "phone": "0712345678",
+    "date": "2025-06-03",
+    "amount": "3,000",
+    "status": "Completed",
+    "receipt": "MPESAX YZ505"
+  },
+  {
+    "id": "CHM002",
+    "name": "David Otieno Owino",
+    "phone": "0723456789",
+    "date": "2025-06-03",
+    "amount": "3,000",
+    "status": "Completed",
+    "receipt": "MPESAX YZ506"
+  },
+  {
+    "id": "CHM003",
+    "name": "Elizabeth Mwake",
+    "phone": "0734567890",
+    "date": "2025-06-03",
+    "amount": "3,000",
+    "status": "Completed",
+    "receipt": "MPESAX YZ507"
+  },
+  {
+    "id": "CHM004",
+    "name": "Jane Nyeri Kamau",
+    "phone": "0745678901",
+    "date": "2025-06-03",
+    "amount": "3,000",
+    "status": "Completed",
+    "receipt": "MPESAX YZ508"
+  },
+  {
+    "id": "CHM005",
+    "name": "Ahmed Nazer Hussein",
+    "phone": "0756789012",
+    "date": "2025-06-03",
+    "amount": "3,000",
+    "status": "Completed",
+    "receipt": "MPESAX YZ509"
+  },
+  {
+    "id": "CHM006",
+    "name": "Mary Atieno Achieng",
+    "phone": "0767890123",
+    "date": "2025-06-03",
+    "amount": "3,000",
+    "status": "Completed",
+    "receipt": "MPESAX YZ510"
+  },
+  {
+    "id": "CHM007",
+    "name": "Samuel Mwangi Thuo",
+    "phone": "0778901234",
+    "date": "2025-06-03",
+    "amount": "3,000",
+    "status": "Completed",
+    "receipt": "MPESAX YZ511"
+  },
+  {
+    "id": "CHM008",
+    "name": "Grace Wanjiku Muriuki",
+    "phone": "0789012345",
+    "date": "2025-06-03",
+    "amount": "3,000",
+    "status": "Completed",
+    "receipt": "MPESAX YZ512"
+  },
+  {
+    "id": "CHM009",
+    "name": "Peter Kiprono Cheruiyot",
+    "phone": "0790123456",
+    "date": "2025-06-03",
+    "amount": "3,000",
+    "status": "Completed",
+    "receipt": "MPESAX YZ513"
+  },
+  {
+    "id": "CHM010",
+    "name": "Catherine Njeri Wambui",
+    "phone": "0701234567",
+    "date": "2025-06-03",
+    "amount": "3,000",
+    "status": "Completed",
+    "receipt": "MPESAX YZ514"
+  },
+  {
+    "id": "CHM011",
+    "name": "John Mwangi Kariuki",
+    "phone": "0712345679",
+    "date": "2025-06-03",
+    "amount": "3,000",
+    "status": "Completed",
+    "receipt": "MPESAX YZ515"
+  },
+  {
+    "id": "CHM012",
+    "name": "Fatuma Hassan Mohamed",
+    "phone": "0723456780",
+    "date": "2025-06-03",
+    "amount": "3,000",
+    "status": "Completed",
+    "receipt": "MPESAX YZ516"
+  },
+];
 
     return Scaffold(
       appBar: AppBar(
@@ -813,6 +1225,27 @@ class GeneralChamaContributionsScreen extends StatelessWidget {
     );
   }
 }
+Future<void> initiateSTKPush(String phone, String amount, BuildContext context) async {
+  final response = await http.post(
+    Uri.parse('http://192.168.117.181:3001/mpesa/stkpush'), 
+    headers: {"Content-Type": "application/json"},
+    body: jsonEncode({
+      "phone": phone,  // Example: "254712345678"
+      "amount": amount // Example: "100"
+    }),
+  );
+
+  if (response.statusCode == 200) {
+    final res = jsonDecode(response.body);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text("STK Push success: ${res['CustomerMessage'] ?? 'Prompt sent!'}")),
+    );
+  } else {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text("STK Push failed: ${response.body}")),
+    );
+  }
+}
 
 // --- DEPOSITS SCREEN ---
 class DepositsScreen extends StatefulWidget {
@@ -827,58 +1260,37 @@ class _DepositsScreenState extends State<DepositsScreen> {
   final amountController = TextEditingController();
   bool _loading = false;
 
-  Future<void> payWithMpesa() async {
-    final phone = phoneController.text.trim();
-    final amount = amountController.text.trim();
+ Future<void> payWithMpesa() async {
+  final phone = phoneController.text.trim();
+  final amount = amountController.text.trim();
 
-    if (phone.isEmpty || !RegExp(r'^254\d{9}$').hasMatch(phone)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Enter a valid phone (2547XXXXXXXX)")),
-      );
-      return;
-    }
-    if (amount.isEmpty || double.tryParse(amount) == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Enter a valid amount")),
-      );
-      return;
-    }
-
-    setState(() => _loading = true);
-    final url = Uri.parse('http://192.168.117.181:3001/mpesa/stkpush');
-    try {
-      final res = await http.post(
-        url,
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'phone': phone, 'amount': amount}),
-      );
-      setState(() => _loading = false);
-      if (res.statusCode == 200) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Payment prompt sent!")),
-        );
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Payment failed: ${res.body}")),
-        );
-      }
-    } catch (e) {
-      setState(() => _loading = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Error: $e")),
-      );
-    }
+  if (phone.isEmpty || !RegExp(r'^254\d{9}$').hasMatch(phone)) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text("Enter a valid phone (2547XXXXXXXX)")),
+    );
+    return;
+  }
+  if (amount.isEmpty || double.tryParse(amount) == null) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text("Enter a valid amount")),
+    );
+    return;
   }
 
+  setState(() => _loading = true);
+  await initiateSTKPush(phone, amount, context);
+  setState(() => _loading = false);
+}
+   
   @override
   Widget build(BuildContext context) {
     final Map<String, String> userDetails = {
-      "fullName": "Charlie Pele",
-      "memberId": "CHM001",
-      "joinedDate": "2024-01-10",
-      "phone": "+254712345678",
-      "groupName": "Kilimani munna choma",
-      "monthlyTarget": "KES 3,000",
+  "fullName": "Lucy Nduta Gichuru",
+  "memberId": "CHM001",
+  "joinedDate": "2024-01-10",
+  "phone": "+254712345678",
+  "groupName": "Kilimani Munna Choma",
+  "monthlyTarget": "KES 3,000",
     };
 
     final List<Map<String, String>> deposits = [
@@ -1123,64 +1535,20 @@ class ProfitsAndDividendsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final List<Map<String, String>> membersData = [
-      {
-        'id': 'CHM001',
-        'name': 'Lucy Nduta Gichuru',
-        'contributions': '12,000',
-        'share': '10%',
-        'dividend': '3,000',
-        'status': 'Paid'
-      },
-      {
-        'id': 'CHM002',
-        'name': 'David Otieno Owino',
-        'contributions': '12,000',
-        'share': '10%',
-        'dividend': '3,000',
-        'status': 'Paid'
-      },
-      {
-        'id': 'CHM003',
-        'name': 'Elizabeth Mwake',
-        'contributions': '9,000',
-        'share': '7.5%',
-        'dividend': '2,250',
-        'status': 'Paid'
-      },
-      {
-        'id': 'CHM004',
-        'name': 'Jane Nyeri Kamau',
-        'contributions': '6,000',
-        'share': '5%',
-        'dividend': '1,500',
-        'status': 'Paid'
-      },
-      {
-        'id': 'CHM005',
-        'name': 'Ahmed Nazer Hussein',
-        'contributions': '6,000',
-        'share': '5%',
-        'dividend': '1,500',
-        'status': 'Paid'
-      },
-      {
-        'id': 'CHM006',
-        'name': 'Mary Atieno Achieng',
-        'contributions': '6,000',
-        'share': '5%',
-        'dividend': '1,500',
-        'status': 'Paid'
-      },
-      {
-        'id': 'CHM007',
-        'name': 'Samuel Mwangi Thuo',
-        'contributions': '6,000',
-        'share': '5%',
-        'dividend': '1,500',
-        'status': 'Paid'
-      },
-    ];
+     final List<Map<String, String>> membersData = [
+  {'id': 'CHM001', 'name': 'Lucy Nduta Gichuru', 'contributions': '12,000', 'share': '10%', 'dividend': '3,000', 'status': 'Paid'},
+  {'id': 'CHM002', 'name': 'David Otieno Owino', 'contributions': '12,000', 'share': '10%', 'dividend': '3,000', 'status': 'Paid'},
+  {'id': 'CHM003', 'name': 'Elizabeth Mwake', 'contributions': '12,000', 'share': '10%', 'dividend': '3,000', 'status': 'Paid'},
+  {'id': 'CHM004', 'name': 'Jane Nyeri Kamau', 'contributions': '12,000', 'share': '10%', 'dividend': '3,000', 'status': 'Paid'},
+  {'id': 'CHM005', 'name': 'Ahmed Nazer Hussein', 'contributions': '12,000', 'share': '10%', 'dividend': '3,000', 'status': 'Paid'},
+  {'id': 'CHM006', 'name': 'Mary Atieno Achieng', 'contributions': '12,000', 'share': '10%', 'dividend': '3,000', 'status': 'Paid'},
+  {'id': 'CHM007', 'name': 'Samuel Mwangi Thuo', 'contributions': '12,000', 'share': '10%', 'dividend': '3,000', 'status': 'Paid'},
+  {'id': 'CHM008', 'name': 'Grace Wanjiku Muriuki', 'contributions': '12,000', 'share': '10%', 'dividend': '3,000', 'status': 'Paid'},
+  {'id': 'CHM009', 'name': 'Peter Kiprono Cheruiyot', 'contributions': '12,000', 'share': '10%', 'dividend': '3,000', 'status': 'Paid'},
+  {'id': 'CHM010', 'name': 'Catherine Njeri Wambui', 'contributions': '12,000', 'share': '10%', 'dividend': '3,000', 'status': 'Paid'},
+  {'id': 'CHM011', 'name': 'John Mwangi Kariuki', 'contributions': '12,000', 'share': '10%', 'dividend': '3,000', 'status': 'Paid'},
+  {'id': 'CHM012', 'name': 'Fatuma Hassan Mohamed', 'contributions': '12,000', 'share': '10%', 'dividend': '3,000', 'status': 'Paid'},
+];
 
     return Scaffold(
       appBar: AppBar(
@@ -1244,13 +1612,20 @@ class _LoanRequestFormScreenState extends State<LoanRequestFormScreen> {
   final TextEditingController repaymentPeriodController = TextEditingController();
   final TextEditingController purposeController = TextEditingController();
 
-  final List<Map<String, String>> membersList = [
-    {'id': 'CHM001', 'name': 'Lucy Nduta Gichuru'},
-    {'id': 'CHM002', 'name': 'David Otieno Owino'},
-    {'id': 'CHM003', 'name': 'Elizabeth Mwake'},
-    {'id': 'CHM004', 'name': 'Jane Nyeri Kamau'},
-  ];
-
+   final List<Map<String, String>> membersList = [
+  {'id': 'CHM001', 'name': 'Lucy Nduta Gichuru'},
+  {'id': 'CHM002', 'name': 'David Otieno Owino'},
+  {'id': 'CHM003', 'name': 'Elizabeth Mwake'},
+  {'id': 'CHM004', 'name': 'Jane Nyeri Kamau'},
+  {'id': 'CHM005', 'name': 'Ahmed Nazer Hussein'},
+  {'id': 'CHM006', 'name': 'Mary Atieno Achieng'},
+  {'id': 'CHM007', 'name': 'Samuel Mwangi Thuo'},
+  {'id': 'CHM008', 'name': 'Grace Wanjiku Muriuki'},
+  {'id': 'CHM009', 'name': 'Peter Kiprono Cheruiyot'},
+  {'id': 'CHM010', 'name': 'Catherine Njeri Wambui'},
+  {'id': 'CHM011', 'name': 'John Mwangi Kariuki'},
+  {'id': 'CHM012', 'name': 'Fatuma Hassan Mohamed'},
+];
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -1340,6 +1715,107 @@ class _LoanRequestFormScreenState extends State<LoanRequestFormScreen> {
     );
   }
 }
+//LOAN APPROVAL SCREEN
+ class LoanApprovalScreen extends StatefulWidget {
+  const LoanApprovalScreen({super.key});
+  @override
+  State<LoanApprovalScreen> createState() => _LoanApprovalScreenState();
+}
+
+class _LoanApprovalScreenState extends State<LoanApprovalScreen> {
+  
+  List<Map<String, dynamic>> loanRequests = [
+    {
+      'id': 'CHM001',
+      'name': 'Lucy Nduta Gichuru',
+      'amount': '10,000',
+      'period': '12',
+      'purpose': 'Business expansion',
+      'status': 'Pending'
+    },
+    {
+      'id': 'CHM002',
+      'name': 'David Otieno Owino',
+      'amount': '5,000',
+      'period': '6',
+      'purpose': 'School fees',
+      'status': 'Pending'
+    },
+    {
+      'id': 'CHM003',
+      'name': 'Elizabeth Mwake',
+      'amount': '8,000',
+      'period': '10',
+      'purpose': 'Medical emergency',
+      'status': 'Pending'
+    },
+  ];
+
+  void _updateStatus(int index, String newStatus) {
+    setState(() {
+      loanRequests[index]['status'] = newStatus;
+    });
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text("Loan ${newStatus.toLowerCase()} for ${loanRequests[index]['name']}")),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text("Loan Approval")),
+      body: loanRequests.isEmpty
+          ? const Center(child: Text("No pending loan requests."))
+          : ListView.builder(
+              itemCount: loanRequests.length,
+              itemBuilder: (context, index) {
+                final req = loanRequests[index];
+                return Card(
+                  margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+                  child: ListTile(
+                    title: Text("${req['name']} (${req['id']})"),
+                    subtitle: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text("Amount: KES ${req['amount']}"),
+                        Text("Period: ${req['period']} months"),
+                        Text("Purpose: ${req['purpose']}"),
+                        Text("Status: ${req['status']}",
+                          style: TextStyle(
+                            color: req['status'] == "Pending"
+                                ? Colors.orange
+                                : req['status'] == "Approved"
+                                    ? Colors.green
+                                    : Colors.red,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                    trailing: req['status'] == "Pending"
+                        ? Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              IconButton(
+                                icon: const Icon(Icons.check, color: Colors.green),
+                                tooltip: "Approve",
+                                onPressed: () => _updateStatus(index, "Approved"),
+                              ),
+                              IconButton(
+                                icon: const Icon(Icons.close, color: Colors.red),
+                                tooltip: "Reject",
+                                onPressed: () => _updateStatus(index, "Rejected"),
+                              ),
+                            ],
+                          )
+                        : null,
+                  ),
+                );
+              },
+            ),
+    );
+  }
+}
 
 // --- FINES INCURRED SCREEN ---
 class FinesIncurredScreen extends StatelessWidget {
@@ -1348,9 +1824,13 @@ class FinesIncurredScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final List<Map<String, String>> fines = [
-      {"member": "Jane Doe", "reason": "Late payment", "amount": "KES 200"},
-      {"member": "John Smith", "reason": "Missed meeting", "amount": "KES 150"},
-    ];
+  {"member": "Lucy Nduta Gichuru", "reason": "Late payment", "amount": "KES 200"},
+  {"member": "David Otieno Owino", "reason": "Missed meeting", "amount": "KES 150"},
+  {"member": "Elizabeth Mwake", "reason": "Missed deadline", "amount": "KES 100"},
+  {"member": "Jane Nyeri Kamau", "reason": "Late payment", "amount": "KES 200"},
+  {"member": "Ahmed Nazer Hussein", "reason": "Missed meeting", "amount": "KES 150"},
+  {"member": "Mary Atieno Achieng", "reason": "Missed deadline", "amount": "KES 100"},
+];
 
     return Scaffold(
       appBar: AppBar(title: const Text("Fines Incurred")),
@@ -1393,10 +1873,14 @@ class ChatRoomScreen extends StatefulWidget {
 
 class _ChatRoomScreenState extends State<ChatRoomScreen> {
   final TextEditingController _controller = TextEditingController();
-  final List<Map<String, dynamic>> messages = [
-    {"text": "Hi everyone!", "sender": "Jane"},
-    {"text": "Hello Jane!", "sender": "John"},
-  ];
+   final List<Map<String, dynamic>> messages = [
+  {"text": "Hi everyone!", "sender": "Lucy Nduta Gichuru"},
+  {"text": "Hello Lucy!", "sender": "David Otieno Owino"},
+  {"text": "How is everyone doing?", "sender": "Elizabeth Mwake"},
+  {"text": "All good here!", "sender": "Jane Nyeri Kamau"},
+  {"text": "Ready for the next meeting.", "sender": "Ahmed Nazer Hussein"},
+  {"text": "Looking forward to it!", "sender": "Mary Atieno Achieng"},
+];
 
   void _sendMessage() {
     final text = _controller.text.trim();
@@ -1539,7 +2023,7 @@ class MembersScreen extends StatelessWidget {
   }
 }
 
-// --- AI ASSISTANT DIALOG (placeholder) ---
+// --- AI ASSISTANT DIALOG  ---
 class AIAssistantDialog extends StatefulWidget {
   const AIAssistantDialog({super.key});
   @override
@@ -1548,104 +2032,130 @@ class AIAssistantDialog extends StatefulWidget {
 
 class _AIAssistantDialogState extends State<AIAssistantDialog> {
   final TextEditingController _controller = TextEditingController();
-  String? _response;
-  bool _loading = false;
-
-  Future<void> _askAI() async {
-    if (_controller.text.trim().isEmpty) return;
-    setState(() {
-      _loading = true;
-      _response = null;
-    });
-
-    try {
-      // Replace with your actual AI backend endpoint
-      final url = Uri.parse('http://192.168.117.181:3000/ai');
-      final res = await http.post(
-        url,
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'question': _controller.text}),
-      );
-
-      if (res.statusCode == 200) {
-        final data = jsonDecode(res.body);
-        setState(() {
-          _response = data['answer'] ?? "No answer received.";
-          _loading = false;
-        });
-      } else {
-        setState(() {
-          _response = "Error: ${res.statusCode} ${res.reasonPhrase}";
-          _loading = false;
-        });
-      }
-    } catch (e) {
-      setState(() {
-        _response = "Failed to connect to AI: $e";
-        _loading = false;
-      });
-    }
-  }
-
+  final List<String> _responses = [];
+ void _sendMessage() async {
+  final text = _controller.text.trim();
+  if (text.isEmpty) return;
+  setState(() {
+    _responses.add("You: $text");
+  });
+  final aiResponse = await getGeminiResponse(text);
+  setState(() {
+    _responses.add("AI: $aiResponse");
+    _controller.clear();
+  });
+}
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
+      title: const Text("AI Assistant"),
       content: SizedBox(
-        width: 350,
+        width: double.maxFinite,
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.auto_awesome, color: Colors.amber, size: 48),
-            const SizedBox(height: 8),
-            const Text(
-              "AI ASSISTANT",
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 18,
-                color: Colors.amber,
+            Expanded(
+              child: ListView(
+                shrinkWrap: true,
+                children: _responses.map((r) => Text(r)).toList(),
               ),
             ),
-            const SizedBox(height: 12),
             TextField(
               controller: _controller,
-              decoration: const InputDecoration(
-                labelText: "Ask me anything...",
-                border: OutlineInputBorder(),
-              ),
-              minLines: 1,
-              maxLines: 3,
+              decoration: const InputDecoration(hintText: "Ask me anything..."),
+              onSubmitted: (_) => _sendMessage(),
             ),
-            const SizedBox(height: 12),
-            ElevatedButton(
-              onPressed: _loading ? null : _askAI,
-              child: _loading
-                  ? const SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Text("Send"),
-            ),
-            const SizedBox(height: 16),
-            if (_response != null)
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.grey[100],
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  _response!,
-                  style: const TextStyle(fontSize: 15),
-                ),
-              ),
           ],
         ),
       ),
       actions: [
-        TextButton( 
+        TextButton(
           onPressed: () => Navigator.pop(context),
           child: const Text("Close"),
+        ),
+        ElevatedButton(
+          onPressed: _sendMessage,
+          child: const Text("Send"),
+        ),
+      ],
+    );
+  }
+} 
+// GEMINI FUNCTION FOR AI ASSISTANT
+Future<String> getGeminiResponse(String prompt) async {
+  final url = Uri.parse('http://192.168.56.1:3001/gemini/ask'); // Use your backend IP
+  final headers = {'Content-Type': 'application/json'};
+  final body = jsonEncode({"prompt": prompt});
+
+  final response = await http.post(url, headers: headers, body: body);
+  if (response.statusCode == 200) {
+    final data = jsonDecode(response.body);
+    return data['text'] ?? "No response";
+  } else {
+    return "Error: ${response.body}";
+  }
+}
+// ADMIN MEETINGS CALENDAR WIDGET
+class _AdminMeetingsCalendar extends StatefulWidget {
+  @override
+  State<_AdminMeetingsCalendar> createState() => _AdminMeetingsCalendarState();
+}
+
+class _AdminMeetingsCalendarState extends State<_AdminMeetingsCalendar> {
+  List<DateTime> meetings = [
+    DateTime.now().add(const Duration(days: 2)),
+    DateTime.now().add(const Duration(days: 7)),
+  ];
+
+  void _addMeetingDate(DateTime date) {
+    setState(() {
+      meetings.add(date);
+    });
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text("Meeting added for ${date.toLocal()}")),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        SizedBox(
+          height: 350,
+          child: TableCalendar(
+            firstDay: DateTime.utc(2020, 1, 1),
+            lastDay: DateTime.utc(2030, 12, 31),
+            focusedDay: DateTime.now(),
+            selectedDayPredicate: (date) =>
+                meetings.any((m) =>
+                    m.year == date.year &&
+                    m.month == date.month &&
+                    m.day == date.day),
+            calendarBuilders: CalendarBuilders(
+              markerBuilder: (context, date, events) {
+                if (meetings.any((m) =>
+                    m.year == date.year &&
+                    m.month == date.month &&
+                    m.day == date.day)) {
+                  return const Icon(Icons.event, color: Colors.green, size: 16);
+                }
+                return null;
+              },
+            ),
+            onDaySelected: (selectedDay, focusedDay) {
+              if (!meetings.any((m) =>
+                  m.year == selectedDay.year &&
+                  m.month == selectedDay.month &&
+                  m.day == selectedDay.day)) {
+                _addMeetingDate(selectedDay);
+              }
+            },
+          ),
+        ),
+        const SizedBox(height: 8),
+        const Text(
+          "Tap a date to add a meeting.",
+          style: TextStyle(fontSize: 12, color: Colors.grey),
         ),
       ],
     );
